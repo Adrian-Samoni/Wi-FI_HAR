@@ -1,0 +1,64 @@
+#!/usr/bin/env python3
+import os
+import sys
+import shutil
+import subprocess
+
+def main():
+    SRC_ROOT   = "F:/Datasets/MY_DATASET/csi_raw"
+    DST_ROOT   = "F:/Datasets/MY_DATASET/csi_csv"
+    ACTIVITIES = ["bend", "run", "walk", "sitdown", "fall", "liedown", "standup"]
+
+    # make sure csikit is on PATH
+    if shutil.which("csikit") is None:
+        print(
+            "⚠️  `csikit` not found on your PATH. "
+            "Install it via `pip install csikit` and ensure `csikit` is runnable.",
+            file=sys.stderr
+        )
+        sys.exit(1)
+
+    # create top‐level output folder
+    os.makedirs(DST_ROOT, exist_ok=True)
+
+    for act in ACTIVITIES:
+        src_dir = os.path.join(SRC_ROOT, act)
+        dst_dir = os.path.join(DST_ROOT, act)
+        os.makedirs(dst_dir, exist_ok=True)
+
+        if not os.path.isdir(src_dir):
+            print(f"⚠️  Skipping missing folder {src_dir}", file=sys.stderr)
+            continue
+
+        for fname in sorted(os.listdir(src_dir)):
+            if not fname.lower().endswith(".pcap"):
+                continue
+
+            base     = os.path.splitext(fname)[0]
+            src_path = os.path.join(src_dir, fname)
+            dst_path = os.path.join(dst_dir, base + ".csv")
+
+            print(f"🔄  Converting {src_path} → {dst_path}")
+
+            try:
+                # tell csikit exactly where to dump the CSV
+                subprocess.run(
+                    [
+                        "csikit",
+                        "--csv",
+                        "--csv_dest", dst_path,
+                        src_path
+                    ],
+                    check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                )
+                print(f"✅  Wrote {dst_path}")
+            except subprocess.CalledProcessError as e:
+                err = e.stderr.decode(errors="ignore").strip()
+                print(f"❌  Failed {src_path}:\n{err}", file=sys.stderr)
+
+    print(f"\n🎉  All done—your CSVs live in {os.path.abspath(DST_ROOT)}")
+
+if __name__ == "__main__":
+    main()
